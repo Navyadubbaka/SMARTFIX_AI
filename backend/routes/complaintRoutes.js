@@ -12,6 +12,7 @@ const {
     acceptJob,
     startJob,
     resolveJob,
+    payBill,
     rateJob,
     getTechComplaints
 } = require("../controllers/complaintController");
@@ -23,6 +24,7 @@ router.get("/all", getAllComplaints);
 
 // User
 router.get("/user/:userId", getUserComplaints);
+router.put("/pay/:id", payBill);
 router.put("/rate/:id", rateJob);
 
 // Technician

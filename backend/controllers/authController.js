@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 // 🔐 Register
 exports.registerUser = async (req, res) => {
     try {
-        const { name, email, password, role, skill } = req.body;
+        const { name, email, password, role, skill, phone } = req.body;
 
         // Check existing user
         const userExists = await User.findOne({ email });
@@ -17,6 +17,7 @@ exports.registerUser = async (req, res) => {
             name,
             email,
             password,
+            phone: phone || null,
             role: role || "user"
         };
         
@@ -50,6 +51,10 @@ exports.loginUser = async (req, res) => {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
+        if (user.isBlocked) {
+            return res.status(403).json({ message: "Your account has been blocked by the admin." });
+        }
+
         // Generate token
         const token = jwt.sign(
             { id: user._id, role: user.role },
@@ -78,12 +83,17 @@ exports.getAllUsers = async (req, res) => {
     }
 };
 
-// 🔐 Delete User (Admin)
-exports.deleteUser = async (req, res) => {
+// 🔐 Toggle Block User (Admin)
+exports.toggleBlockUser = async (req, res) => {
     try {
         const { id } = req.params;
-        await User.findByIdAndDelete(id);
-        res.json({ message: "User deleted successfully" });
+        const user = await User.findById(id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        user.isBlocked = !user.isBlocked;
+        await user.save();
+        
+        res.json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'} successfully`, user });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

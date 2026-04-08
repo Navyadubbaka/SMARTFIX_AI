@@ -24,7 +24,7 @@ const complaintSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["Pending Acceptance", "Accepted", "In Progress", "Resolved"],
+        enum: ["Pending Acceptance", "Accepted", "In Progress", "Pending Payment", "Resolved"],
         default: "Pending Acceptance"
     },
     assignedAt: {
@@ -42,6 +42,23 @@ const complaintSchema = new mongoose.Schema({
     rating: {
         type: Number,
         default: null
+    },
+    priority: {
+        type: String,
+        enum: ["Low", "Medium", "High"],
+        default: "Low"
+    },
+    aiConfidence: {
+        type: Number,
+        default: null
+    },
+    billAmount: {
+        type: Number,
+        default: null
+    },
+    isPaid: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 

@@ -24,6 +24,7 @@ exports.createComplaint = async (req, res) => {
         );
 
         const category = response.data.category;
+        const confidence = response.data.confidence || null;
 
         if (category === "Unclear") {
             return res.status(400).json({ 
@@ -32,7 +33,15 @@ exports.createComplaint = async (req, res) => {
             });
         }
 
-        console.log("🤖 AI Response Category:", category);
+        console.log("🤖 AI Response Category:", category, "| Confidence:", confidence);
+
+        // Determine priority based on category
+        let priority = "Low";
+        if (category === "electrical" || category === "fire") {
+            priority = "High";
+        } else if (category === "plumbing") {
+            priority = "Medium";
+        }
 
         // 🔥 Save complaint without forcefully auto-assigning
         // Technicians will see this in their dashboard and must click "Accept"
@@ -41,6 +50,8 @@ exports.createComplaint = async (req, res) => {
             description,
             image: req.file.filename,
             category,
+            aiConfidence: confidence,
+            priority,
             technicianId: null,
             status: "Pending Acceptance"
         });
@@ -82,6 +93,15 @@ exports.getAvailableJobs = async (req, res) => {
 exports.acceptJob = async (req, res) => {
     try {
         const { techId } = req.body;
+        
+        // Find complaint first to check status
+        const existingComplaint = await Complaint.findById(req.params.id);
+        if (!existingComplaint) return res.status(404).json({ message: "Job not found" });
+        
+        if (existingComplaint.status !== "Pending Acceptance" || existingComplaint.technicianId) {
+            return res.status(400).json({ message: "Job has already been accepted by another technician." });
+        }
+
         const complaint = await Complaint.findByIdAndUpdate(
             req.params.id,
             { 
@@ -95,7 +115,7 @@ exports.acceptJob = async (req, res) => {
         // Mark technician busy
         await User.findByIdAndUpdate(techId, { available: false });
         
-        req.app.get("io").emit("complaintUpdated", { message: "Job accepted" });
+        req.app.get("io").emit("complaintUpdated", { message: "Job accepted", complaintId: complaint._id, status: "Accepted" });
 
         res.json({ message: "Job Accepted", complaint });
     } catch (error) {
@@ -118,12 +138,38 @@ exports.startJob = async (req, res) => {
     }
 };
 
-// 🔥 RESOLVE JOB
+// 🔥 RESOLVE JOB (Now sets to Pending Payment)
 exports.resolveJob = async (req, res) => {
+    try {
+        const { billAmount } = req.body;
+        
+        const complaint = await Complaint.findByIdAndUpdate(
+            req.params.id,
+            { 
+                status: "Pending Payment", 
+                billAmount: billAmount || 0 
+            },
+            { new: true }
+        );
+
+        req.app.get("io").emit("complaintUpdated", { message: "Job awaiting payment", status: "Pending Payment" });
+
+        res.json({ message: "Job marked for payment", complaint });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 🔥 PAY BILL (Sets to Resolved)
+exports.payBill = async (req, res) => {
     try {
         const complaint = await Complaint.findByIdAndUpdate(
             req.params.id,
-            { status: "Resolved", resolvedAt: new Date() },
+            { 
+                status: "Resolved", 
+                isPaid: true,
+                resolvedAt: new Date() 
+            },
             { new: true }
         );
 
@@ -132,9 +178,9 @@ exports.resolveJob = async (req, res) => {
             await User.findByIdAndUpdate(complaint.technicianId, { available: true });
         }
         
-        req.app.get("io").emit("complaintUpdated", { message: "Job resolved" });
+        req.app.get("io").emit("complaintUpdated", { message: "Payment successful, Job resolved", status: "Resolved" });
 
-        res.json({ message: "Job Resolved", complaint });
+        res.json({ message: "Payment Successful", complaint });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -201,7 +247,7 @@ exports.getAllComplaints = async (req, res) => {
 exports.getUserComplaints = async (req, res) => {
     try {
         const complaints = await Complaint.find({ userId: req.params.userId })
-            .populate("technicianId", "name rating")
+            .populate("technicianId", "name rating phone")
             .sort({ createdAt: -1 });
         res.json(complaints);
     } catch (error) {

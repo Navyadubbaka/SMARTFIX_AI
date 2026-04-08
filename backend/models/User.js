@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema({
     reviewCount: {
         type: Number,
         default: 0
+    },
+    isBlocked: {
+        type: Boolean,
+        default: false
+    },
+    phone: {
+        type: String,
+        default: null
     }
 }, { timestamps: true });
 
