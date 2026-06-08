@@ -75,7 +75,4 @@ A workflow file is configured in `.github/workflows/ci.yml` to:
   set PORT=5001 && node server.js
   ```
 - If image uploads fail, make sure `backend/uploads/` exists and the AI model service is running.
-- For MongoDB access, your app uses:
-  ```text
-  mongodb+srv://smartfix_user:smartfix123@smartfix-cluster.m3nk2to.mongodb.net/smartfix
-  ```
+
